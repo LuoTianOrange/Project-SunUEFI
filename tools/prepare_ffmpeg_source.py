@@ -8,6 +8,7 @@ import shutil
 import subprocess
 import tarfile
 import tempfile
+import time
 import urllib.request
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -34,8 +35,28 @@ def prepare(output, apply_patches=True, series=SERIES):
     cache = ROOT / 'build/source-cache' / ('ffmpeg-' + record['upstream_version'] + '-source') / archive['filename']
     cache.parent.mkdir(parents=True, exist_ok=True)
     if not cache.exists():
-        with urllib.request.urlopen(url) as response:
-            cache.write_bytes(response.read())
+        # Upstream mirrors (ffmpeg.org) intermittently reset connections from
+        # hosted runners. Download to a part file with a timeout and bounded
+        # retries so a truncated transfer never lands in the cache.
+        part = cache.with_name(cache.name + '.part')
+        last = None
+        for attempt in range(4):
+            try:
+                with urllib.request.urlopen(url, timeout=180) as response, \
+                        open(part, 'wb') as stream:
+                    shutil.copyfileobj(response, stream, 1024 * 1024)
+                if part.stat().st_size != archive['size']:
+                    raise ValueError('truncated transfer: %d bytes' % part.stat().st_size)
+                part.replace(cache)
+                last = None
+                break
+            except Exception as error:  # noqa: BLE001 - retried below
+                last = error
+                part.unlink(missing_ok=True)
+                if attempt < 3:
+                    time.sleep(10 * (attempt + 1))
+        if last is not None:
+            raise ValueError('FFmpeg source download failed after retries: %s' % last)
     if cache.stat().st_size != archive['size'] or sha(cache) != archive['sha256']:
         raise ValueError('FFmpeg upstream archive checksum mismatch')
     patches = []
