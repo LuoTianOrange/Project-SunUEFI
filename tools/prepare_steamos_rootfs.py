@@ -12,6 +12,7 @@ from pathlib import Path
 import shutil
 import subprocess
 import sys
+import time
 import urllib.request
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -22,14 +23,35 @@ def digest(path):
         return hashlib.file_digest(stream, 'sha256').hexdigest()
 
 
-def download(url, path, expected):
+def download(url, path, expected, attempts=4, timeout=300):
+    """Fetch url into path with bounded retries and atomic replacement.
+
+    Every external fetch in the SteamOS pipeline goes through here: the Valve
+    base image, the Steam client packages, Proton and the runtime, plus the
+    sensor sources. Those CDNs intermittently reset connections or stall from
+    hosted runners, so a partial transfer must never survive as a cache hit.
+    """
     if not path.exists():
         partial = path.with_suffix(path.suffix + '.partial')
-        with urllib.request.urlopen(url, timeout=60) as source, partial.open('wb') as target:
-            shutil.copyfileobj(source, target)
-        if digest(partial) != expected:
-            raise ValueError('Download checksum mismatch: ' + url)
-        partial.replace(path)
+        last = None
+        for attempt in range(attempts):
+            try:
+                with urllib.request.urlopen(url, timeout=timeout) as source, \
+                        partial.open('wb') as target:
+                    shutil.copyfileobj(source, target, 1024 * 1024)
+                if digest(partial) != expected:
+                    raise ValueError('Download checksum mismatch: ' + url)
+                partial.replace(path)
+                last = None
+                break
+            except Exception as error:  # noqa: BLE001 - retried below
+                last = error
+                partial.unlink(missing_ok=True)
+                if attempt + 1 < attempts:
+                    time.sleep(10 * (attempt + 1))
+        if last is not None:
+            raise ValueError('Download failed after %d attempts (%s): %s'
+                             % (attempts, url, last))
     if digest(path) != expected:
         raise ValueError('Cached input checksum mismatch: ' + str(path))
 
