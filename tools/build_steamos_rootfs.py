@@ -252,6 +252,13 @@ done
         locale.write_text('en_US.UTF-8 UTF-8\nzh_CN.UTF-8 UTF-8\n')
         guest(['locale-gen'])
     for name in kde_recipes(output / 'kde-recipes', root):
+        if name == 'powerdevil':
+            # Valve 公开源的 kio 已升到 6.26，而项目锁定的 KF6 为 6.24，
+            # FindKF6 的版本区间检查会把 KF6KIO 判为 missing，powerdevil
+            # 无法完成自建。保留源内版本，优先产出可用镜像。
+            print('skip powerdevil rebuild: KF6 6.24 vs kio 6.26 in public repo',
+                  flush=True)
+            continue
         recipe = output / 'kde-recipes' / name
         packages = output / 'packages' / name
         if not kde_package_is_current(packages, recipe):
