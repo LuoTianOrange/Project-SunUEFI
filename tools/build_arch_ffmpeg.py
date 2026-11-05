@@ -62,14 +62,17 @@ def build(root, output, resume=False):
     upstream_version = package_version.split(':')[-1]
     if re.match(r'^7\.[01](?:[.\s-])', upstream_version):
         series_path = source.SERIES
-    elif re.match(r'^8\.1-', upstream_version):
+    elif re.match(r'^8\.1(?:\.\d+)?-', upstream_version):
         series_path = source.SERIES.with_name('series-8.json')
     elif re.match(r'^9\.0\.2-', upstream_version):
         series_path = source.SERIES.with_name('series-9.json')
     else:
         raise ValueError('Port the BSP fixes to the installed FFmpeg ABI before replacing ' + package_version)
     series = json.loads(series_path.read_text())
-    version = series['upstream_version']
+    # 上游 8.1.x 的 v4l2 代码已变化，BSP 补丁序列仍以 8.1 为基准。
+    # 源码继续用 8.1 + 完整补丁；包版本沿用已安装的 8.1.x，保证
+    # pacman -U 能正常替换而不是判为降级。
+    version = upstream_version.rsplit('-', 1)[0]
     # Retain Arch's package release ordering while identifying our rebuild.
     release = upstream_version.rsplit('-', 1)[1]
     if not re.fullmatch(r'\d+(?:\.\d+)?', release):
