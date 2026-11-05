@@ -207,7 +207,7 @@ def build(args):
                'bluez-qt', 'networkmanager-qt', 'modemmanager-qt',
                'bluedevil', 'plasma-nm', 'kinfocenter', 'powerdevil',
                'discover', 'packagekit', 'packagekit-qt6', 'pacman-contrib',
-               'dconf', 'noto-fonts-cjk']
+               'dconf', 'noto-fonts-cjk', 'kio']
         # Some Frame packages, including SDDM, are shipped in the base but
         # absent from the public repositories. Syu already refreshes packages
         # available there; request only unmet dependencies in this step.
