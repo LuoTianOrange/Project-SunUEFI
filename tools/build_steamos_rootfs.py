@@ -192,7 +192,7 @@ def build(args):
         # Frame split these files into clang-libs; the public repository now
         # ships them in clang itself. Remove that obsolete split package before
         # the full transaction, which installs the current compiler and libs.
-        for obsolete in ('clang-libs', 'deckard-steamvr-session'):
+        for obsolete in ('clang-libs', 'deckard-steamvr-session', 'holo-glibc-locales'):
             if subprocess.run(['chroot', root, 'pacman', '-Qq', obsolete],
                               stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode == 0:
                 # The VR session also claims plasma.desktop, now supplied by
